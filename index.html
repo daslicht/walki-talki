@@ -300,26 +300,45 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     socket.on('peer-left', (data) => {
-        console.log('Peer getrennt:', data);
+        console.log('Peer getrennt:', data.nickname, '(', data.id, ')');
+        
+        // Entferne Peer aus lokaler Liste
         peers.delete(data.id);
-        speakingPeers.delete(data.id); // Aus speakingPeers entfernen
+        speakingPeers.delete(data.id);
+        
+        // Verwende aktualisierte Peer-Liste vom Server (falls vorhanden)
+        if (data.updatedPeerList) {
+            console.log('Aktualisiere Peer-Liste vom Server:', data.updatedPeerList.length, 'Peers');
+            // Synchronisiere lokale Liste mit Server-Liste
+            peers.clear();
+            data.updatedPeerList.forEach(peer => {
+                if (peer.id !== socket.id) { // Eigene ID nicht hinzufügen
+                    peers.set(peer.id, peer);
+                }
+            });
+        }
+        
+        // Aktualisiere UI
         updatePeerList();
         
-        // Remote-Audio-Element entfernen
+        // Bereinige Remote-Audio-Element
         const audioElement = remoteAudioElements.get(data.id);
         if (audioElement) {
             audioElement.pause();
             audioElement.srcObject = null;
             audioElement.remove();
             remoteAudioElements.delete(data.id);
-            console.log(`Remote-Audio-Element von ${data.id} entfernt`);
+            console.log(`Remote-Audio-Element von ${data.nickname} entfernt`);
         }
         
-        // Schließe PeerConnection wenn vorhanden
+        // Schließe und bereinige PeerConnection
         if (peerConnections[data.id]) {
             peerConnections[data.id].close();
             delete peerConnections[data.id];
+            console.log(`PeerConnection zu ${data.nickname} geschlossen`);
         }
+        
+        console.log('✅ Peer vollständig entfernt. Verbleibende Peers:', peers.size);
     });
 
     socket.on('disconnect', () => {

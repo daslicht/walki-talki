@@ -5,18 +5,19 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
 // Peer-Liste mit Nicknames
 const peers = new Map();
 
-// Socket.io Client-Bibliothek verfügbar machen
-app.get('/socket.io/socket.io.js', (req, res) => {
-  res.sendFile(path.join(__dirname, 'node_modules/socket.io/client-dist/socket.io.js'));
-});
-
-// Statische Dateien servieren
+// Statische Dateien servieren (ZUERST!)
 app.use(express.static(__dirname));
+app.use('/socket.io', express.static(path.join(__dirname, 'node_modules/socket.io/client-dist')));
 
 // Hauptseite
 app.get('/', (req, res) => {
@@ -110,9 +111,21 @@ io.on('connection', (socket) => {
     console.log('Client getrennt:', socket.id);
     const peer = peers.get(socket.id);
     if (peer) {
+      // Lösche Nutzer aus der Peer-Liste
       peers.delete(socket.id);
-      // Informiere alle anderen über Disconnect
-      socket.broadcast.emit('peer-left', { id: socket.id, nickname: peer.nickname });
+      console.log('Nutzer entfernt:', peer.nickname, '(', socket.id, ')');
+      
+      // Erstelle aktualisierte Peer-Liste
+      const updatedPeerList = Array.from(peers.values());
+      
+      // Informiere alle verbleibenden Clients über Disconnect
+      io.emit('peer-left', { 
+        id: socket.id, 
+        nickname: peer.nickname,
+        updatedPeerList: updatedPeerList 
+      });
+      
+      console.log('Verbleibende Peers:', updatedPeerList.length);
     }
   });
 });
