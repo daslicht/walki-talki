@@ -648,6 +648,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Audio NICHT beim Start initialisieren - wartet auf User-Interaktion
+    
+    // Sofortiger Disconnect bei Seitenverlassen
+    window.addEventListener('beforeunload', (e) => {
+        if (socket && socket.connected) {
+            console.log('Seite wird verlassen, sende leaving-Event');
+            // Sende synchrones leaving-Event an Server
+            socket.emit('leaving');
+        }
+    });
 });
 </script>
 </body>

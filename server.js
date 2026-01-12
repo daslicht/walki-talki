@@ -107,6 +107,29 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Leaving Event: Sofortiger Disconnect bei beforeunload
+  socket.on('leaving', () => {
+    console.log('Client verlässt Seite (beforeunload):', socket.id);
+    const peer = peers.get(socket.id);
+    if (peer) {
+      // Lösche Nutzer sofort aus der Peer-Liste
+      peers.delete(socket.id);
+      console.log('Nutzer sofort entfernt:', peer.nickname, '(', socket.id, ')');
+      
+      // Erstelle aktualisierte Peer-Liste
+      const updatedPeerList = Array.from(peers.values());
+      
+      // Informiere ALLE Clients (inkl. Sender) über sofortigen Disconnect
+      io.emit('peer-left', { 
+        id: socket.id, 
+        nickname: peer.nickname,
+        updatedPeerList: updatedPeerList 
+      });
+      
+      console.log('Sofortiger Disconnect durchgeführt. Verbleibende Peers:', updatedPeerList.length);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('Client getrennt:', socket.id);
     const peer = peers.get(socket.id);
