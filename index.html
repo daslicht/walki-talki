@@ -239,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updatePeerList() {
         if (peers.size === 0) {
-            peerListContent.innerHTML = 'Niemand verbunden';
+            peerListContent.innerHTML = 'Noch nicht verbunden';
             return;
         }
         
@@ -271,6 +271,11 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log('Mit Server verbunden:', socket.id);
         myId = socket.id;
         
+        // Füge mich selbst zur lokalen Peer-Liste hinzu
+        peers.set(myId, { id: myId, nickname: myNickname });
+        console.log('Eigenen Eintrag zur Peer-Liste hinzugefügt');
+        updatePeerList();
+        
         // Registriere Nickname beim Server
         socket.emit('register', { nickname: myNickname });
     });
@@ -281,6 +286,11 @@ document.addEventListener("DOMContentLoaded", () => {
         peerList.forEach(peer => {
             peers.set(peer.id, peer);
         });
+        // Stelle sicher, dass ich selbst auch in der Liste bin
+        if (myId && !peers.has(myId)) {
+            peers.set(myId, { id: myId, nickname: myNickname });
+            console.log('Eigenen Eintrag zur Peer-Liste hinzugefügt');
+        }
         updatePeerList();
         
         // UI aktivieren nach erfolgreicher Registrierung
@@ -312,10 +322,13 @@ document.addEventListener("DOMContentLoaded", () => {
             // Synchronisiere lokale Liste mit Server-Liste
             peers.clear();
             data.updatedPeerList.forEach(peer => {
-                if (peer.id !== socket.id) { // Eigene ID nicht hinzufügen
-                    peers.set(peer.id, peer);
-                }
+                peers.set(peer.id, peer);
             });
+            // Stelle sicher, dass ich selbst auch in der Liste bin
+            if (myId && !peers.has(myId)) {
+                peers.set(myId, { id: myId, nickname: myNickname });
+                console.log('Eigenen Eintrag zur Peer-Liste hinzugefügt');
+            }
         }
         
         // Aktualisiere UI
@@ -346,7 +359,12 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = '❌ Getrennt';
         isConnected = false;
         pttButton.disabled = true;
+        // Behalte nur meinen eigenen Eintrag in der Peer-Liste
+        const myPeer = myId ? peers.get(myId) : null;
         peers.clear();
+        if (myPeer) {
+            peers.set(myId, myPeer);
+        }
         speakingPeers.clear();
         updatePeerList();
     });
