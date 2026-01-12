@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walkie-Talkie PTT</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .container {
+            text-align: center;
+            color: white;
+        }
+        
+        #connectButton {
+            padding: 20px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            background: #2196F3;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+            margin-bottom: 30px;
+        }
+        
+        #connectButton:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+        }
+        
+        #connectButton:active {
+            transform: translateY(0);
+        }
+        
+        #connectButton.hidden {
+            display: none;
+        }
+        
+        #nicknameInput {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid white;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+            width: 200px;
+        }
+        
+        .peer-list {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            color: white;
+        }
+        
+        .peer-list h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 8px;
+        }
+        
+        .peer-item {
+            padding: 5px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .peer-status {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .peer-status.talking {
+            background: rgba(255, 152, 0, 0.8);
+            color: white;
+            font-weight: bold;
+            animation: statusBlink 0.8s infinite;
+        }
+        
+        @keyframes statusBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .peer-item.me {
+            background: rgba(33, 150, 243, 0.3);
+            font-weight: bold;
+        }
+        
+        .peer-item.speaking {
+            background: rgba(255, 152, 0, 0.5);
+            animation: speakingPulse 0.8s infinite;
+        }
+        
+        @keyframes speakingPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        #pttButton {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: none;
+            background: #4CAF50;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            user-select: none;
+        }
+        
+        #pttButton:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        #pttButton:active {
+            background: #45a049;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transform: scale(0.95);
+        }
+        
+        #pttButton.talking {
+            background: #f44336;
+            animation: pulse 0.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .status {
+            margin-top: 30px;
+            font-size: 18px;
+        }
+        
+        .info {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .incoming-indicator {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            padding: 15px 25px;
+            background: #ff9800;
+            color: white;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            animation: blink 1s infinite;
+        }
+        
+        .incoming-indicator.active {
+            display: block;
+        }
+        
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="incoming-indicator" id="incomingIndicator">📡 Empfange Audio...</div>
+    
+    <div class="peer-list" id="peerList">
+        <h3>👥 Verbundene Peers</h3>
+        <div id="peerListContent">Niemand verbunden</div>
+    </div>
+    
+    <div class="container">
+        <h1>🎙️ Walkie-Talkie</h1>
+        <input type="text" id="nicknameInput" placeholder="Dein Nickname" maxlength="20">
+        <button id="connectButton">🔌 Verbinden</button>
+        <button id="pttButton" disabled>DRÜCKEN<br>ZUM SPRECHEN</button>
+        <div class="status" id="status">Klicke auf Verbinden</div>
+        <div class="info">Halte die Taste oder Leertaste gedrückt zum Sprechen</div>
+    </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    let localStream = null;
+    let isTalking = false;
+    let socket = null;
+    let peerConnections = {};
+    let remoteAudioElements = new Map(); // Tracke alle Remote-Audio-Elemente
+
+    const pttButton = document.getElementById('pttButton');
+    const connectButton = document.getElementById('connectButton');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const peerListContent = document.getElementById('peerListContent');
+    const status = document.getElementById('status');
+    const incomingIndicator = document.getElementById('incomingIndicator');
+    let isConnected = false;
+    let myNickname = '';
+    let myId = '';
+    let peers = new Map();
+    let speakingPeers = new Set(); // Tracke welche Peers gerade sprechen
+
+    // Socket.io - noch nicht verbinden
+    socket = io('http://localhost:3000', { autoConnect: false });
+
+    function updatePeerList() {
+        if (peers.size === 0) {
+            peerListContent.innerHTML = 'Niemand verbunden';
+            return;
+        }
+        
+        let html = '';
+        peers.forEach((peer) => {
+            const isMe = peer.id === myId;
+            const isSpeaking = speakingPeers.has(peer.id);
+            const className = isMe ? 'peer-item me' : 'peer-item';
+            const label = isMe ? ' (Du)' : '';
+            
+            let statusBadge = '';
+            if (isMe && isTalking) {
+                statusBadge = '<span class="peer-status talking">🔴 spricht</span>';
+            } else if (!isMe && isSpeaking) {
+                statusBadge = '<span class="peer-status talking">🔴 spricht</span>';
+            } else {
+                statusBadge = '<span class="peer-status">🔇 stumm</span>';
+            }
+            
+            html += `<div class="${className}" data-peer-id="${peer.id}">
+                        <span>${peer.nickname}${label}</span>
+                        ${statusBadge}
+                    </div>`;
+        });
+        peerListContent.innerHTML = html;
+    }
+
+    socket.on('connect', () => {
+        console.log('Mit Server verbunden:', socket.id);
+        myId = socket.id;
+        
+        // Registriere Nickname beim Server
+        socket.emit('register', { nickname: myNickname });
+    });
+
+    socket.on('peer-list', (peerList) => {
+        console.log('Peer-Liste empfangen:', peerList);
+        peers.clear();
+        peerList.forEach(peer => {
+            peers.set(peer.id, peer);
+        });
+        updatePeerList();
+        
+        // UI aktivieren nach erfolgreicher Registrierung
+        if (!isConnected) {
+            isConnected = true;
+            connectButton.classList.add('hidden');
+            nicknameInput.classList.add('hidden');
+            pttButton.disabled = false;
+            status.textContent = '✅ Bereit';
+        }
+    });
+
+    socket.on('peer-joined', (data) => {
+        console.log('Neuer Peer:', data);
+        peers.set(data.id, data);
+        updatePeerList();
+    });
+
+    socket.on('peer-left', (data) => {
+        console.log('Peer getrennt:', data);
+        peers.delete(data.id);
+        speakingPeers.delete(data.id); // Aus speakingPeers entfernen
+        updatePeerList();
+        
+        // Remote-Audio-Element entfernen
+        const audioElement = remoteAudioElements.get(data.id);
+        if (audioElement) {
+            audioElement.pause();
+            audioElement.srcObject = null;
+            audioElement.remove();
+            remoteAudioElements.delete(data.id);
+            console.log(`Remote-Audio-Element von ${data.id} entfernt`);
+        }
+        
+        // Schließe PeerConnection wenn vorhanden
+        if (peerConnections[data.id]) {
+            peerConnections[data.id].close();
+            delete peerConnections[data.id];
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Vom Server getrennt');
+        status.textContent = '❌ Getrennt';
+        isConnected = false;
+        pttButton.disabled = true;
+        peers.clear();
+        speakingPeers.clear();
+        updatePeerList();
+    });
+
+    // PTT Events empfangen
+    socket.on('ptt-start', (data) => {
+        console.log('Anderer Client spricht:', data.from, data.nickname);
+        incomingIndicator.textContent = `📡 ${data.nickname} spricht...`;
+        incomingIndicator.classList.add('active');
+        
+        // Markiere Peer als sprechend
+        speakingPeers.add(data.from);
+        updatePeerList(); // Liste aktualisieren um Status zu zeigen
+        
+        // Markiere Peer in der Liste als sprechend (für Animation)
+        const peerElement = document.querySelector(`[data-peer-id="${data.from}"]`);
+        if (peerElement) {
+            peerElement.classList.add('speaking');
+        }
+    });
+
+    socket.on('ptt-stop', (data) => {
+        console.log('Anderer Client hat aufgehört:', data.from, data.nickname);
+        incomingIndicator.classList.remove('active');
+        
+        // Entferne Peer aus sprechenden
+        speakingPeers.delete(data.from);
+        updatePeerList(); // Liste aktualisieren um Status zu ändern
+        
+        // Entferne Sprechend-Markierung
+        const peerElement = document.querySelector(`[data-peer-id="${data.from}"]`);
+        if (peerElement) {
+            peerElement.classList.remove('speaking');
+        }
+    });
+
+    // Server fordert uns auf, ein Offer zu erstellen
+    socket.on('create-offer', async (data) => {
+        const { to } = data;
+        console.log('📤 Erstelle Offer für', to);
+        
+        const pc = createPeerConnection(to);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        socket.emit('offer', {
+            to: to,
+            offer: offer
+        });
+    });
+
+    // WebRTC Signaling - nur Offers verarbeiten
+    socket.on('offer', async (data) => {
+        const { from, offer } = data;
+        console.log('📥 Offer empfangen von', from);
+        
+        if (peerConnections[from]) {
+            console.log('Schließe alte Verbindung zu', from);
+            peerConnections[from].close();
+        }
+        
+        const pc = createPeerConnection(from);
+        console.log('PeerConnection erstellt für', from);
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log('Remote Description gesetzt');
+        const answer = await pc.createAnswer();
+        console.log('Answer erstellt');
+        await pc.setLocalDescription(answer);
+        console.log('Local Description gesetzt, sende Answer zurück');
+        
+        socket.emit('answer', {
+            to: from,
+            answer: answer
+        });
+    });
+
+    socket.on('answer', async (data) => {
+        const { from, answer } = data;
+        console.log('📥 Answer empfangen von', from);
+        const pc = peerConnections[from];
+        if (pc && pc.signalingState !== 'stable') {
+            console.log('Setze Remote Description (Answer)');
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('✅ WebRTC Verbindung hergestellt');
+        } else {
+            console.warn('Keine PeerConnection oder bereits stabil:', from, pc?.signalingState);
+        }
+    });
+
+    socket.on('ice-candidate', async (data) => {
+        const { from, candidate } = data;
+        const pc = peerConnections[from];
+        if (pc && candidate) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+    });
+
+    async function initAudio() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
+            console.log("Mikrofon initialisiert - Eigenes Audio stumm");
+            console.log("Tracks:", localStream.getTracks().map(t => ({id: t.id, kind: t.kind, enabled: t.enabled})));
+        } catch (err) {
+            console.error("Fehler beim Initialisieren:", err);
+            status.textContent = "Fehler: Mikrofon-Zugriff verweigert";
+        }
+    }
+
+    function createPeerConnection(peerId) {
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        // Lokalen Stream hinzufügen
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+        }
+
+        // Remote Stream empfangen
+        pc.ontrack = (event) => {
+            console.log('🎵 Remote Audio empfangen von', peerId);
+            console.log('Stream:', event.streams[0]);
+            console.log('Tracks:', event.streams[0].getTracks());
+            console.log('Audio Tracks aktiv:', event.streams[0].getAudioTracks().map(t => ({id: t.id, enabled: t.enabled, muted: t.muted})));
+            
+            const audio = new Audio();
+            audio.srcObject = event.streams[0];
+            audio.autoplay = true;
+            audio.volume = 1.0;
+            audio.muted = false;  // WICHTIG: Nicht muten!
+            
+            audio.play().then(() => {
+                console.log('✅ Audio wird abgespielt, Volume:', audio.volume, 'Muted:', audio.muted);
+            }).catch(err => {
+                console.error('❌ Fehler beim Abspielen:', err);
+            });
+            
+            // Speichere Audio-Element für spätere Kontrolle
+            remoteAudioElements.set(peerId, audio);
+            document.body.appendChild(audio);
+        };
+
+        // ICE Candidates senden
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('ice-candidate', {
+                    to: peerId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        peerConnections[peerId] = pc;
+        return pc;
+    }
+
+    // Connect-Button Handler
+    connectButton.addEventListener('click', async () => {
+        // Validiere Nickname
+        myNickname = nicknameInput.value.trim();
+        if (!myNickname) {
+            alert('Bitte gib einen Nickname ein!');
+            nicknameInput.focus();
+            return;
+        }
+        
+        console.log('Verbinde als', myNickname);
+        connectButton.disabled = true;
+        nicknameInput.disabled = true;
+        connectButton.textContent = '⏳ Verbinde...';
+        status.textContent = 'Initialisiere Audio...';
+        
+        // Audio initialisieren (muss durch User-Interaktion geschehen)
+        await initAudio();
+        
+        // Socket verbinden
+        socket.connect();
+    });
+
+    async function startTalking() {
+        if (!isTalking && localStream && isConnected) {
+            isTalking = true;
+            pttButton.classList.add('talking');
+            pttButton.textContent = 'SPRECHEN';
+            status.textContent = '🔴 SENDEN...';
+            console.log("PTT aktiviert");
+            
+            // Peer-Liste aktualisieren um eigenen Status anzuzeigen
+            updatePeerList();
+            
+            // Audio-Tracks aktivieren
+            localStream.getTracks().forEach(track => {
+                track.enabled = true;
+            });
+            console.log("Lokale Audio-Tracks aktiviert");
+            
+            // Remote-Audio-Elemente wieder aktivieren (für Empfang)
+            remoteAudioElements.forEach((audio, peerId) => {
+                audio.muted = false;
+                audio.play().catch(err => console.error('Fehler beim Abspielen:', err));
+                console.log(`Remote-Audio von ${peerId} reaktiviert`);
+            });
+
+            // PTT Start Event senden
+            socket.emit('ptt-start');
+
+            // BROADCAST: Wir wissen noch nicht die IDs der anderen Clients
+            // Der Server wird unser Offer an alle weiterleiten
+            console.log('📤 Sende Offer-Broadcast an Server');
+            
+            socket.emit('offer-broadcast');
+        }
+    }
+
+    function stopTalking() {
+        if (isTalking) {
+            // SOFORT lokale Audio-Tracks deaktivieren (ERSTE Priorität!)
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    track.enabled = false;
+                });
+                console.log("Lokale Audio-Tracks SOFORT deaktiviert");
+            }
+            
+            // SOFORT alle Remote-Audio-Elemente pausieren und muten
+            remoteAudioElements.forEach((audio, peerId) => {
+                audio.pause();
+                audio.muted = true;
+                console.log(`Remote-Audio von ${peerId} pausiert und gemutet`);
+            });
+            
+            isTalking = false;
+            pttButton.classList.remove('talking');
+            pttButton.textContent = 'DRÜCKEN\nZUM SPRECHEN';
+            status.textContent = 'Bereit';
+            console.log("PTT deaktiviert");
+            
+            // Peer-Liste aktualisieren um eigenen Status zu ändern
+            updatePeerList();
+            
+            // PTT Stop Event senden
+            socket.emit('ptt-stop');
+        }
+    }
+
+    // Mouse Events
+    pttButton.addEventListener('mousedown', startTalking);
+    pttButton.addEventListener('mouseup', stopTalking);
+    pttButton.addEventListener('mouseleave', stopTalking);
+
+    // Touch Events (für Mobile)
+    pttButton.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startTalking();
+    });
+    pttButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        stopTalking();
+    });
+
+    // Keyboard Events (Leertaste)
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat && isConnected && !pttButton.disabled) {
+            e.preventDefault();
+            startTalking();
+        }
+    });
+    document.addEventListener('keyup', (e) => {
+        if (e.code === 'Space' && isConnected) {
+            e.preventDefault();
+            stopTalking();
+        }
+    });
+
+    // Audio NICHT beim Start initialisieren - wartet auf User-Interaktion
+});
+</script>
+</body>
+</html>
