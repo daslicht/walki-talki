@@ -234,8 +234,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let peers = new Map();
     let speakingPeers = new Set(); // Tracke welche Peers gerade sprechen
 
-    // Socket.io - noch nicht verbinden
-    socket = io('http://localhost:3000', { autoConnect: false });
+    // Socket.io - verbindet sich automatisch mit dem Server
+    socket = io({ autoConnect: false });
 
     function updatePeerList() {
         if (peers.size === 0) {
